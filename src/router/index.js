@@ -9,7 +9,8 @@ const routes = [
   // @符号代表src目录的绝对路径名地址
   // index.vue是默认索引文件，不用设置，代码更节省、更优雅
   // name属性作用：编程式导航可以利用
-  { path: '/login', name: 'login', component: () => import('@/views/login') }
+  { path: '/login', name: 'login', component: () => import('@/views/login') },
+  { path: '/home', name: 'home', component: () => import('@/views/home') }
 ]
 
 const router = new VueRouter({
