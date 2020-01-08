@@ -17,4 +17,14 @@ const router = new VueRouter({
   routes
 })
 
+// 守卫
+router.beforeEach((to, from, next) => {
+  // 用户如果是非登录状态，还要访问其他页面，强制登录
+  let userinfo = window.sessionStorage.getItem('userinfo')
+  if (!userinfo && to.path !== '/login') {
+    return next('/login')
+  }
+  next()
+})
+
 export default router

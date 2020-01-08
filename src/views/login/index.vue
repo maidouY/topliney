@@ -20,7 +20,7 @@
                     </span>
                 </el-form-item>
                 <el-form-item>
-                    <el-button style="width:100%;" type="primary" @click="login()">登录</el-button>
+                    <el-button style="width:100%;" type="primary" @click="login()" :disabled="isLoading" :loading="isLoading">登录</el-button>
                 </el-form-item>
             </el-form>
         </div>
@@ -28,6 +28,9 @@
 </template>
 
 <script>
+// 对gt.js文件进行导入
+// gt.js文件本身没有做导出动作，所以就直接导入即可，此时系统增加一个全局变量，名称为 initGeeTest
+import './gt.js'
 
 export default {
   data () {
@@ -43,11 +46,15 @@ export default {
       }
     }
     return {
+      // 极验对象
+      capObj: null,
+      // 设置按钮初始状态
+      isLoading: false,
       // 表单数据对象
       loginForm: {
-        mobile: '',
-        code: '',
-        xieyi: false
+        mobile: '13911111111',
+        code: '246810',
+        xieyi: true
       },
       //   表单校验
       loginFormRules: {
@@ -83,24 +90,79 @@ export default {
           return false
         }
 
-        // 服务器端账号真实校验
-        let p = this.$http({
-          url: '/authorizations',
-          method: 'POST',
-          data: this.loginForm
+        // 用户重复单击登录使用缓存好的极验对象
+        // 判断极验窗口对象存在，就直接使用
+        if (this.capObj !== null) {
+          return this.capObj.verify()
+        }
+
+        // 设置登录按钮为禁用、等待状态
+        this.isLoading = true
+
+        // 人机交互验证
+        // axios获得极验的秘钥信息
+        let pro = this.$http({
+          url: '/captchas/' + this.loginForm.mobile,
+          method: 'GET'
         })
-        p
+        pro
           .then(res => {
-            console.log(res)
+            // console.log(res)
+            // 从res里解构下述的data对象（对象结构赋值）
+            let { data } = res.data
+            // 请检测data的数据结构， 保证data.gt, data.challenge, data.success有值
+            window.initGeetest({
+              gt: data.gt,
+              challenge: data.challenge,
+              offline: !data.success,
+              new_captcha: true,
+              product: 'bind' // 设置窗口样式
+            }, captchaObj => {
+              // 这里可以调用验证实例 captchaObj 的实例方法
+              // captchaObj:极验窗口对象
+              captchaObj.onReady(() => {
+                // 验证码ready之后才能调用verify方法显示验证码（可以显示窗口了）
+                captchaObj.verify() // 显示验证码窗口
+                this.isLoading = false
+                this.capObj = captchaObj
+              }).onSuccess(() => {
+                // 行为校验正确的处理
+                // 验证账号，登录系统
+                this.loginAct()
+              }).onError(() => {
+                // 行为校验错误处理
+              })
+            })
           })
           .catch(err => {
-            console.log('手机号码或验证码错误' + err)
+            return this.$message.error('获取极验秘钥失败' + err)
           })
-
-        // 路由编程式导航
-        // this.$router.push('/home')
-        this.$router.push({ name: 'home' })
       })
+    },
+    // 账号真实性校验，并登录
+    loginAct () {
+    // 服务器端账号真实校验
+      let pro = this.$http({
+        url: '/authorizations',
+        method: 'POST',
+        data: this.loginForm
+      })
+      pro
+        .then(res => {
+          // console.log(res)
+          if (res.status === 201) {
+            // 客户端浏览器把服务器返回的秘钥等相关信息通过sessionStorage做记录，表明是登录状态
+            window.sessionStorage.setItem('userinfo', JSON.stringify(res.data.data))
+            // 路由编程式导航
+            // this.$router.push('/home')
+            // 进入后台系统
+            this.$router.push({ name: 'home' })
+          }
+        })
+        .catch(err => {
+          // console.log('手机号码或验证码错误' + err)
+          this.$message.error('手机号码或验证码错误' + err)
+        })
     }
   }
 }
